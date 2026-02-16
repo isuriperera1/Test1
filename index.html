@@ -138,8 +138,7 @@
             auth: {
                 clientId: "4dc5efa6-49cb-4991-9cbf-1867596a2110",
                 authority: "https://login.microsoftonline.com/abd34cc0-2911-44eb-abea-713c02c9b3e8",
-                redirectUri: window.location.origin + window.location.pathname,
-                navigateToLoginRequestUrl: false
+                redirectUri: window.location.origin + window.location.pathname
             },
             cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
         };
@@ -147,33 +146,25 @@
         const msalInstance = new msal.PublicClientApplication(msalConfig);
         let currentAccount = null;
 
-        // Check if we're in a popup (MSAL auth redirect)
-        // If so, hide the page content while MSAL processes
-        if (window.opener && window.opener !== window) {
-            // We're in a popup - hide everything while MSAL handles auth
-            document.body.style.visibility = 'hidden';
-        }
-
-        // Handle any redirect response (for popup flow, this processes the auth response)
-        msalInstance.handleRedirectPromise().then(response => {
-            if (response) {
-                currentAccount = response.account;
-            }
-            
-            // If we're NOT in a popup, initialize normally
-            if (!window.opener || window.opener === window) {
+        // Initialize MSAL and check for existing accounts
+        async function initializeMsal() {
+            try {
+                // Handle redirect promise first (in case we came back from a redirect)
+                await msalInstance.handleRedirectPromise();
+                
+                // Check for existing accounts
                 const accounts = msalInstance.getAllAccounts();
                 if (accounts.length > 0) {
                     currentAccount = accounts[0];
                 }
                 updateUI();
+            } catch (error) {
+                console.error("MSAL init error:", error);
             }
-            // If we ARE in a popup, MSAL loginPopup() will handle closing it
-        }).catch(error => {
-            console.error("Auth init error:", error);
-            // Make sure page is visible if there's an error
-            document.body.style.visibility = 'visible';
-        });
+        }
+
+        // Call initialize on page load
+        initializeMsal();
 
         async function initAuth() {
             try {
@@ -207,11 +198,10 @@
 
         async function signIn() {
             try {
-                const response = await msalInstance.loginPopup({
+                // Use redirect flow instead of popup - more reliable with GitHub Pages
+                await msalInstance.loginRedirect({
                     scopes: ["User.Read", "Files.Read.All", "Calendars.Read"]
                 });
-                currentAccount = response.account;
-                updateUI();
             } catch (error) {
                 console.error("Login error:", error);
                 alert("Login failed: " + error.message);
@@ -219,9 +209,7 @@
         }
 
         function signOut() {
-            msalInstance.logoutPopup({ account: currentAccount });
-            currentAccount = null;
-            updateUI();
+            msalInstance.logoutRedirect({ account: currentAccount });
         }
 
         function handleAuth() {
@@ -230,8 +218,8 @@
 
         async function getToken() {
             if (!currentAccount) { 
-                await signIn();
-                if (!currentAccount) return null;
+                signIn();
+                return null;
             }
             try {
                 const response = await msalInstance.acquireTokenSilent({
@@ -240,10 +228,11 @@
                 });
                 return response.accessToken;
             } catch (error) {
-                const response = await msalInstance.acquireTokenPopup({
+                // If silent fails, redirect to login
+                msalInstance.acquireTokenRedirect({
                     scopes: ["User.Read", "Files.Read.All", "Calendars.Read"]
                 });
-                return response.accessToken;
+                return null;
             }
         }
 
