@@ -140,30 +140,47 @@
                 authority: "https://login.microsoftonline.com/abd34cc0-2911-44eb-abea-713c02c9b3e8",
                 redirectUri: window.location.origin + window.location.pathname
             },
-            cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true }
+            cache: { 
+                cacheLocation: "localStorage", 
+                storeAuthStateInCookie: true 
+            }
         };
         
         const msalInstance = new msal.PublicClientApplication(msalConfig);
         let currentAccount = null;
 
-        // Initialize MSAL and check for existing accounts
+        // Initialize MSAL - MUST be called before anything else
         async function initializeMsal() {
             try {
-                // Handle redirect promise first (in case we came back from a redirect)
-                await msalInstance.handleRedirectPromise();
+                console.log("Initializing MSAL...");
                 
-                // Check for existing accounts
-                const accounts = msalInstance.getAllAccounts();
-                if (accounts.length > 0) {
-                    currentAccount = accounts[0];
+                // CRITICAL: Handle redirect promise FIRST - this captures the auth response after redirect
+                const response = await msalInstance.handleRedirectPromise();
+                
+                if (response) {
+                    // We just came back from a redirect with an auth response
+                    console.log("Got auth response from redirect:", response.account.username);
+                    currentAccount = response.account;
+                    msalInstance.setActiveAccount(currentAccount);
+                } else {
+                    // Check for existing accounts in cache
+                    const accounts = msalInstance.getAllAccounts();
+                    console.log("Found accounts in cache:", accounts.length);
+                    if (accounts.length > 0) {
+                        currentAccount = accounts[0];
+                        msalInstance.setActiveAccount(currentAccount);
+                    }
                 }
+                
                 updateUI();
+                console.log("MSAL initialized. Signed in:", !!currentAccount);
             } catch (error) {
                 console.error("MSAL init error:", error);
+                updateUI();
             }
         }
 
-        // Call initialize on page load
+        // Call initialize immediately when page loads
         initializeMsal();
 
         async function initAuth() {
@@ -171,6 +188,7 @@
                 const accounts = msalInstance.getAllAccounts();
                 if (accounts.length > 0) {
                     currentAccount = accounts[0];
+                    msalInstance.setActiveAccount(currentAccount);
                 }
                 updateUI();
             } catch (error) {
@@ -217,21 +235,39 @@
         }
 
         async function getToken() {
-            if (!currentAccount) { 
-                signIn();
-                return null;
+            // First check if we have an account
+            if (!currentAccount) {
+                // Try to get from cache
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length > 0) {
+                    currentAccount = accounts[0];
+                    msalInstance.setActiveAccount(currentAccount);
+                } else {
+                    // No account, need to sign in
+                    console.log("No account found, redirecting to sign in...");
+                    signIn();
+                    return null;
+                }
             }
+            
             try {
+                console.log("Acquiring token silently for:", currentAccount.username);
                 const response = await msalInstance.acquireTokenSilent({
                     scopes: ["User.Read", "Files.Read.All", "Calendars.Read"],
                     account: currentAccount
                 });
+                console.log("Token acquired successfully");
                 return response.accessToken;
             } catch (error) {
-                // If silent fails, redirect to login
-                msalInstance.acquireTokenRedirect({
-                    scopes: ["User.Read", "Files.Read.All", "Calendars.Read"]
-                });
+                console.error("Silent token acquisition failed:", error);
+                // If silent fails, try interactive
+                try {
+                    await msalInstance.acquireTokenRedirect({
+                        scopes: ["User.Read", "Files.Read.All", "Calendars.Read"]
+                    });
+                } catch (redirectError) {
+                    console.error("Redirect token acquisition failed:", redirectError);
+                }
                 return null;
             }
         }
