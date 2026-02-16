@@ -51,14 +51,6 @@
     </style>
 </head>
 <body>
-    <!-- Check if we're in an auth popup - if so, don't render the app -->
-    <script>
-        // If this is a popup window opened for auth, hide the body and let MSAL handle it
-        if (window.opener && window.opener !== window && window.location.hash) {
-            document.body.style.display = 'none';
-        }
-    </script>
-    
     <div class="app-container">
         <aside class="sidebar">
             <div class="sidebar-header">
@@ -155,25 +147,32 @@
         const msalInstance = new msal.PublicClientApplication(msalConfig);
         let currentAccount = null;
 
-        // IMPORTANT: Handle popup redirect - if this page is loaded in a popup after auth,
-        // we need to handle the response and close the popup
+        // Check if we're in a popup (MSAL auth redirect)
+        // If so, hide the page content while MSAL processes
+        if (window.opener && window.opener !== window) {
+            // We're in a popup - hide everything while MSAL handles auth
+            document.body.style.visibility = 'hidden';
+        }
+
+        // Handle any redirect response (for popup flow, this processes the auth response)
         msalInstance.handleRedirectPromise().then(response => {
-            // If we're in a popup (opened by loginPopup), close it
-            if (window.opener && window.opener !== window) {
-                // This is a popup window - MSAL will handle closing it
-                return;
-            }
-            // Otherwise continue with normal initialization
             if (response) {
                 currentAccount = response.account;
             }
-            const accounts = msalInstance.getAllAccounts();
-            if (accounts.length > 0) {
-                currentAccount = accounts[0];
+            
+            // If we're NOT in a popup, initialize normally
+            if (!window.opener || window.opener === window) {
+                const accounts = msalInstance.getAllAccounts();
+                if (accounts.length > 0) {
+                    currentAccount = accounts[0];
+                }
+                updateUI();
             }
-            updateUI();
+            // If we ARE in a popup, MSAL loginPopup() will handle closing it
         }).catch(error => {
             console.error("Auth init error:", error);
+            // Make sure page is visible if there's an error
+            document.body.style.visibility = 'visible';
         });
 
         async function initAuth() {
