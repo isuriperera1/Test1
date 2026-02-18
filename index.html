@@ -4,200 +4,269 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teams Recordings</title>
-    <script src="https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f5f5f5; }
+        
         .app-container { display: flex; min-height: 100vh; }
+        
         .sidebar { width: 260px; background: #2c3e50; color: white; }
-        .sidebar-header { padding: 20px; background: #34495e; display: flex; justify-content: space-between; align-items: center; }
+        .sidebar-header { padding: 20px; background: #34495e; }
         .sidebar-header h2 { font-size: 18px; }
-        .profile-icon { width: 36px; height: 36px; background: #3498db; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .profile-icon:hover { background: #2980b9; }
-        .profile-dropdown { position: absolute; top: 50px; right: 10px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); min-width: 220px; z-index: 1000; display: none; }
-        .profile-dropdown.show { display: block; }
-        .profile-info { padding: 15px; border-bottom: 1px solid #eee; }
-        .profile-info h4 { color: #333; margin-bottom: 4px; }
-        .profile-info p { color: #666; font-size: 12px; }
-        .profile-action { padding: 12px 15px; }
         .sidebar-nav { padding: 20px 0; }
-        .nav-item { display: block; width: 100%; padding: 14px 20px; background: none; border: none; color: white; text-align: left; cursor: pointer; font-size: 15px; transition: background 0.2s; }
+        .nav-item { 
+            display: block; width: 100%; padding: 14px 20px; 
+            background: none; border: none; color: white; 
+            text-align: left; cursor: pointer; font-size: 15px; 
+            transition: background 0.2s; 
+        }
         .nav-item:hover { background: #34495e; }
         .nav-item.active { background: #3498db; }
+        
         .main-content { flex: 1; padding: 30px; }
         .content-section { display: none; }
         .content-section.active { display: block; }
+        
         .section-header { margin-bottom: 25px; }
         .section-header h1 { color: #2c3e50; font-size: 26px; margin-bottom: 8px; }
         .section-header p { color: #7f8c8d; }
-        .btn { background: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        
+        .btn { 
+            background: #3498db; color: white; border: none; 
+            padding: 12px 24px; border-radius: 6px; 
+            cursor: pointer; font-size: 14px; 
+            text-decoration: none;
+            display: inline-block;
+        }
         .btn:hover { background: #2980b9; }
-        .btn.danger { background: #e74c3c; }
-        .btn.danger:hover { background: #c0392b; }
         .btn.success { background: #27ae60; }
-        .auth-notice { background: #fff3cd; border: 1px solid #ffc107; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .item-card { background: #f8f9fa; padding: 15px; margin-bottom: 12px; border-radius: 6px; border-left: 4px solid #3498db; }
+        .btn.success:hover { background: #229954; }
+        
+        .card { 
+            background: white; padding: 20px; 
+            border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+            margin-bottom: 20px; 
+        }
+        
+        .item-card { 
+            background: #f8f9fa; padding: 15px; 
+            margin-bottom: 12px; border-radius: 6px; 
+            border-left: 4px solid #3498db; 
+        }
         .item-title { font-weight: 600; color: #2c3e50; margin-bottom: 6px; }
         .item-meta { color: #7f8c8d; font-size: 13px; margin-bottom: 10px; }
-        .item-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-        .item-actions .btn { padding: 6px 12px; font-size: 12px; }
+        .item-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .item-actions .btn { padding: 8px 16px; font-size: 13px; }
+        
         .loading { text-align: center; padding: 40px; color: #7f8c8d; }
-        .error-msg { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 6px; margin-bottom: 15px; }
-        .badge { display: inline-block; background: #3498db; color: white; padding: 3px 10px; border-radius: 12px; font-size: 11px; margin-right: 5px; }
-        .badge.teams { background: #6264a7; }
-        .badge.live { background: #27ae60; }
-        .profile-section { position: relative; }
+        .error-msg { 
+            background: #f8d7da; color: #721c24; 
+            padding: 15px; border-radius: 6px; margin-bottom: 15px; 
+        }
+        .success-msg { 
+            background: #d4edda; color: #155724; 
+            padding: 10px; border-radius: 4px; 
+            font-size: 13px; margin-top: 8px; display: none;
+        }
+        
+        .url-box {
+            background: #f4f6f8; 
+            padding: 10px; 
+            border-radius: 4px;
+            font-size: 12px; 
+            word-break: break-all; 
+            margin: 8px 0;
+            font-family: 'Courier New', monospace;
+            color: #2c3e50;
+        }
     </style>
 </head>
 <body>
     <div class="app-container">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2>Teams App</h2>
-                <div class="profile-section">
-                    <div class="profile-icon" onclick="toggleProfile()">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                            <circle cx="12" cy="7" r="4"/>
-                        </svg>
-                    </div>
-                    <div class="profile-dropdown" id="profileDropdown">
-                        <div class="profile-info" id="profileInfo">
-                            <p>Not signed in</p>
-                        </div>
-                        <div class="profile-action">
-                            <button id="authBtn" class="btn" style="width:100%;" onclick="handleAuth()">Sign in with Microsoft</button>
-                        </div>
-                    </div>
-                </div>
+                <h2>🎥 Teams Recordings</h2>
             </div>
             <nav class="sidebar-nav">
-                <button class="nav-item active" onclick="showSection('recordings', this)"> Recordings</button>
-                <button class="nav-item" onclick="showSection('transcripts', this)"> Transcripts</button>
-                <button class="nav-item" onclick="showSection('calendar', this)"> Calendar</button>
+                <button class="nav-item active" onclick="showSection('recordings', this)">
+                    📹 Recordings
+                </button>
+                <button class="nav-item" onclick="showSection('about', this)">
+                    ℹ️ About
+                </button>
             </nav>
         </aside>
         
         <main class="main-content">
+            <!-- RECORDINGS SECTION -->
             <section id="recordings" class="content-section active">
                 <div class="section-header">
-                    <h1>Recordings</h1>
-                    <p>Your Teams meeting recordings from OneDrive</p>
+                    <h1>Meeting Recordings</h1>
+                    <p>Teams meeting recordings from OneDrive</p>
                 </div>
-                <div id="recordingsAuth" class="auth-notice" style="display:none;">
-                    <p>Sign in with your Microsoft account to view recordings</p>
-                    <button class="btn" onclick="signIn()" style="margin-top:10px;">Sign in with Microsoft</button>
-                </div>
+                
                 <div class="card">
-                    <button class="btn" onclick="loadRecordings()"> Refresh Recordings</button>
+                    <button class="btn" onclick="loadRecordings()">
+                        🔄 Refresh Recordings
+                    </button>
+                    
                     <div id="recordingsList" style="margin-top:20px;">
                         <p class="loading">Click Refresh to load recordings...</p>
                     </div>
                 </div>
             </section>
 
-            <section id="transcripts" class="content-section">
+            <!-- ABOUT SECTION -->
+            <section id="about" class="content-section">
                 <div class="section-header">
-                    <h1>Transcripts</h1>
-                    <p>Meeting transcripts from OneDrive</p>
+                    <h1>About</h1>
+                    <p>Information about this app</p>
                 </div>
-                <div id="transcriptsAuth" class="auth-notice" style="display:none;">
-                    <p>Sign in with your Microsoft account to view transcripts</p>
-                    <button class="btn" onclick="signIn()" style="margin-top:10px;">Sign in with Microsoft</button>
-                </div>
+                
                 <div class="card">
-                    <button class="btn" onclick="loadTranscripts()"> Refresh Transcripts</button>
-                    <div id="transcriptsList" style="margin-top:20px;">
-                        <p class="loading">Click Refresh to load transcripts...</p>
-                    </div>
-                </div>
-            </section>
-
-            <section id="calendar" class="content-section">
-                <div class="section-header">
-                    <h1>Calendar</h1>
-                    <p>Your upcoming Teams meetings</p>
-                </div>
-                <div id="calendarAuth" class="auth-notice" style="display:none;">
-                    <p>Sign in with your Microsoft account to view calendar</p>
-                    <button class="btn" onclick="signIn()" style="margin-top:10px;">Sign in with Microsoft</button>
-                </div>
-                <div class="card">
-                    <button class="btn" onclick="loadCalendar()"> Refresh Calendar</button>
-                    <div id="calendarList" style="margin-top:20px;">
-                        <p class="loading">Click Refresh to load calendar...</p>
-                    </div>
+                    <h3>Teams Recording Manager</h3>
+                    <p style="margin-top:10px;color:#7f8c8d;">
+                        This application fetches Teams meeting recordings from OneDrive 
+                        using Microsoft Graph API with application permissions.
+                    </p>
+                    <p style="margin-top:10px;color:#7f8c8d;">
+                        <strong>Features:</strong>
+                    </p>
+                    <ul style="margin-left:20px;margin-top:8px;color:#7f8c8d;">
+                        <li>List all .mp4 recordings</li>
+                        <li>Stable download URLs</li>
+                        <li>Integration with n8n workflows</li>
+                    </ul>
                 </div>
             </section>
         </main>
     </div>
 
     <script>
+        // ============================================
+        // IMPORTANT: Change this to your backend URL
+        // ============================================
+        const BACKEND_URL = "http://localhost:3002";
+        // For production: "https://your-backend.onrender.com"
 
-const BACKEND_URL = "https://YOUR_BACKEND_DOMAIN"; 
-// Example: https://teams-recordings.onrender.com
-
-async function loadRecordings() {
-    const container = document.getElementById("recordingsList");
-    container.innerHTML = '<p class="loading">Loading recordings...</p>';
-
-    try {
-        const response = await fetch(BACKEND_URL + "/api/recordings");
-        const data = await response.json();
-
-        if (!data.recordings || data.recordings.length === 0) {
-            container.innerHTML = "<p>No recordings found.</p>";
-            return;
+        // Switch between sections
+        function showSection(sectionId, buttonElement) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Remove active from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionId).classList.add('active');
+            
+            // Highlight selected nav item
+            if (buttonElement) {
+                buttonElement.classList.add('active');
+            }
         }
 
-        container.innerHTML = data.recordings.map(r => {
+        // Load recordings from backend
+        async function loadRecordings() {
+            const container = document.getElementById("recordingsList");
+            container.innerHTML = '<p class="loading">⏳ Loading recordings...</p>';
 
-            return `
-                <div class="item-card">
+            try {
+                const response = await fetch(BACKEND_URL + "/api/recordings");
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
 
-                    <div class="item-title">${r.meetingName}</div>
+                if (!data.recordings || data.recordings.length === 0) {
+                    container.innerHTML = `
+                        <p style="text-align:center;color:#7f8c8d;padding:20px;">
+                            No recordings found. Make sure you have .mp4 files in OneDrive.
+                        </p>
+                    `;
+                    return;
+                }
 
-                    <div class="item-meta">
-                        Date: ${new Date(r.meetingDate).toLocaleString()}
+                container.innerHTML = `
+                    <p style="margin-bottom:15px;color:#7f8c8d;">
+                        Found <strong>${data.total}</strong> recording(s)
+                    </p>
+                ` + data.recordings.map(r => `
+                    <div class="item-card">
+                        <div class="item-title">📹 ${r.meetingName}</div>
+                        
+                        <div class="item-meta">
+                            📅 ${new Date(r.meetingDate).toLocaleString()}<br>
+                            💾 Size: ${r.sizeMB}
+                        </div>
+
+                        <div class="url-box">
+                            <strong>Download URL:</strong><br>
+                            ${r.stableDownloadUrl}
+                        </div>
+
+                        <div class="item-actions">
+                            <a href="${r.stableDownloadUrl}" 
+                               target="_blank" 
+                               class="btn success">
+                               ⬇️ Download
+                            </a>
+
+                            <button class="btn" 
+                                    onclick="copyToClipboard('${r.stableDownloadUrl}', this)">
+                                📋 Copy URL
+                            </button>
+
+                            <a href="${r.webUrl}" 
+                               target="_blank" 
+                               class="btn">
+                               🔗 Open in OneDrive
+                            </a>
+                        </div>
+                        
+                        <div class="success-msg" id="copy-msg-${r.itemId}">
+                            ✅ URL copied to clipboard!
+                        </div>
                     </div>
+                `).join("");
 
-                    <div style="background:#f4f6f8;padding:8px;border-radius:4px;
-                                font-size:12px;word-break:break-all;margin-bottom:8px;">
-                        <strong>Download URL:</strong><br>
-                        ${r.stableDownloadUrl}
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error-msg">
+                        <strong>❌ Error loading recordings:</strong><br>
+                        ${error.message}
+                        <br><br>
+                        <small>Make sure your backend is running at: ${BACKEND_URL}</small>
                     </div>
+                `;
+            }
+        }
 
-                    <div class="item-actions">
-                        <a href="${r.stableDownloadUrl}" 
-                           target="_blank" 
-                           class="btn success">
-                           Download
-                        </a>
+        // Copy URL to clipboard
+        function copyToClipboard(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Show success message
+                const itemCard = button.closest('.item-card');
+                const successMsg = itemCard.querySelector('.success-msg');
+                successMsg.style.display = 'block';
+                
+                // Hide after 2 seconds
+                setTimeout(() => {
+                    successMsg.style.display = 'none';
+                }, 2000);
+            });
+        }
 
-                        <button class="btn"
-                                onclick="navigator.clipboard.writeText('${r.stableDownloadUrl}')">
-                                Copy URL
-                        </button>
-
-                        <a href="${r.webUrl}" 
-                           target="_blank" 
-                           class="btn">
-                           Open in OneDrive
-                        </a>
-                    </div>
-
-                </div>
-            `;
-        }).join("");
-
-    } catch (error) {
-        container.innerHTML =
-            '<div class="error-msg">Error: ' + error.message + '</div>';
-    }
-}
-
-</script>
+        // Auto-load recordings on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 App loaded. Backend URL:', BACKEND_URL);
+        });
+    </script>
 </body>
 </html>
-
