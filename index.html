@@ -6,32 +6,12 @@
 <title>Teams Recordings</title>
 <script src="https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js"></script>
 <style>
-/* --- ALL YOUR ORIGINAL CSS UNCHANGED --- */
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Segoe UI',Tahoma,sans-serif;background:#f5f5f5;}
-.app-container{display:flex;min-height:100vh;}
-.sidebar{width:260px;background:#2c3e50;color:white;}
-.sidebar-header{padding:20px;background:#34495e;display:flex;justify-content:space-between;align-items:center;}
-.sidebar-header h2{font-size:18px;}
-.profile-icon{width:36px;height:36px;background:#3498db;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.profile-icon:hover{background:#2980b9;}
-.profile-dropdown{position:absolute;top:50px;right:10px;background:white;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);min-width:220px;z-index:1000;display:none;}
-.profile-dropdown.show{display:block;}
-.profile-info{padding:15px;border-bottom:1px solid #eee;}
-.profile-info h4{color:#333;margin-bottom:4px;}
-.profile-info p{color:#666;font-size:12px;}
-.profile-action{padding:12px 15px;}
-.sidebar-nav{padding:20px 0;}
-.nav-item{display:block;width:100%;padding:14px 20px;background:none;border:none;color:white;text-align:left;cursor:pointer;font-size:15px;transition:background 0.2s;}
-.nav-item:hover{background:#34495e;}
-.nav-item.active{background:#3498db;}
-.main-content{flex:1;padding:30px;}
-.content-section{display:none;}
-.content-section.active{display:block;}
+.main-content{padding:30px;}
 .section-header{margin-bottom:25px;}
 .section-header h1{color:#2c3e50;font-size:26px;margin-bottom:8px;}
-.section-header p{color:#7f8c8d;}
-.btn{background:#3498db;color:white;border:none;padding:12px 24px;border-radius:6px;cursor:pointer;font-size:14px;}
+.btn{background:#3498db;color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:14px;margin-right:8px;}
 .btn:hover{background:#2980b9;}
 .item-card{background:#f8f9fa;padding:15px;margin-bottom:12px;border-radius:6px;border-left:4px solid #3498db;}
 .item-title{font-weight:600;color:#2c3e50;margin-bottom:6px;}
@@ -42,27 +22,22 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#f5f5f5;}
 </head>
 <body>
 
-<div class="app-container">
-<main class="main-content">
-<section id="recordings" class="content-section active">
+<div class="main-content">
 <div class="section-header">
-<h1>Recordings</h1>
-<p>Teams recordings from your specific folder</p>
+<h1>Teams Recordings</h1>
+<p>MP4 files from your specific folder</p>
 </div>
 
-<div class="card">
 <button class="btn" onclick="loadRecordings()">Refresh Recordings</button>
+
 <div id="recordingsList" style="margin-top:20px;">
 <p class="loading">Click Refresh to load recordings...</p>
 </div>
 </div>
-</section>
-</main>
-</div>
 
 <script>
 
-/* ---------------- MSAL CONFIG UNCHANGED ---------------- */
+/* ================= MSAL CONFIG ================= */
 
 const msalConfig = {
 auth: {
@@ -78,20 +53,32 @@ let currentAccount = null;
 
 async function initializeMsal(){
 const response = await msalInstance.handleRedirectPromise();
-if(response){currentAccount=response.account;msalInstance.setActiveAccount(currentAccount);}
-else{
+if(response){
+currentAccount=response.account;
+msalInstance.setActiveAccount(currentAccount);
+}else{
 const accounts=msalInstance.getAllAccounts();
-if(accounts.length>0){currentAccount=accounts[0];msalInstance.setActiveAccount(currentAccount);}
+if(accounts.length>0){
+currentAccount=accounts[0];
+msalInstance.setActiveAccount(currentAccount);
+}
 }
 }
 initializeMsal();
 
+/* ================= TOKEN ================= */
+
 async function getToken(){
 if(!currentAccount){
 const accounts=msalInstance.getAllAccounts();
-if(accounts.length>0){currentAccount=accounts[0];}
-else{await msalInstance.loginRedirect({scopes:["User.Read","Files.Read.All"]});return;}
+if(accounts.length>0){
+currentAccount=accounts[0];
+}else{
+await msalInstance.loginRedirect({scopes:["User.Read","Files.Read.All"]});
+return;
 }
+}
+
 const response=await msalInstance.acquireTokenSilent({
 scopes:["User.Read","Files.Read.All"],
 account:currentAccount
@@ -99,17 +86,53 @@ account:currentAccount
 return response.accessToken;
 }
 
+/* ================= GRAPH CALL ================= */
+
 async function callGraph(endpoint){
 const token=await getToken();
 if(!token)return null;
+
 const response=await fetch("https://graph.microsoft.com/v1.0"+endpoint,{
-headers:{"Authorization":"Bearer "+token}
+headers:{Authorization:"Bearer "+token}
 });
+
 if(!response.ok)throw new Error("Graph API error: "+response.status);
 return response.json();
 }
 
-/* ================== 🔥 UPDATED RECORDINGS FUNCTION ================== */
+/* ================= DOWNLOAD FUNCTION ================= */
+
+async function downloadFile(itemId,fileName){
+
+const token=await getToken();
+if(!token)return;
+
+const response=await fetch(
+`https://graph.microsoft.com/v1.0/me/drive/items/${itemId}/content`,
+{
+headers:{Authorization:"Bearer "+token}
+}
+);
+
+if(!response.ok){
+alert("Download failed");
+return;
+}
+
+const blob=await response.blob();
+const url=window.URL.createObjectURL(blob);
+
+const a=document.createElement("a");
+a.href=url;
+a.download=fileName;
+document.body.appendChild(a);
+a.click();
+a.remove();
+
+window.URL.revokeObjectURL(url);
+}
+
+/* ================= LOAD RECORDINGS ================= */
 
 async function loadRecordings(){
 
@@ -118,7 +141,6 @@ container.innerHTML='<p class="loading">Loading recordings...</p>';
 
 try{
 
-// 🔥 LIST FILES INSIDE YOUR SPECIFIC FOLDER
 const folderId="015RM5L7QFJSFG3HT6M5E3V2GSYMRC45PL";
 
 const data=await callGraph(
@@ -150,6 +172,11 @@ ${r.id}
 <div class="item-meta">
 Size: ${size} | Date: ${date}
 </div>
+
+<button class="btn"
+onclick="downloadFile('${r.id}','${r.name}')">
+Download MP4
+</button>
 
 <a href="${r.webUrl}" target="_blank" class="btn">
 Open in OneDrive
