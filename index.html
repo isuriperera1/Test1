@@ -27,7 +27,6 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#f5f5f5;}
 
 <div class="main-content">
 
-<!-- ================= EXISTING RECORDINGS SECTION ================= -->
 <div class="section-header">
 <h1>📹 Teams Recordings</h1>
 <p>MP4 files from your specific folder</p>
@@ -39,10 +38,8 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#f5f5f5;}
 <p class="loading">Click Refresh to load recordings...</p>
 </div>
 
-<!-- ================= DIVIDER ================= -->
 <div class="section-divider"></div>
 
-<!-- ================= NEW BOT RECORDING SECTION ================= -->
 <div class="section-header">
 <h1>🤖 AutoRecord Bot</h1>
 <p>Schedule automatic recordings for your upcoming meetings</p>
@@ -57,11 +54,7 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:#f5f5f5;}
 
 <script>
 
-/* ================= BACKEND URL ================= */
-const BACKEND_URL = "http://localhost:3002"; 
-// Change to your deployed URL: https://your-app.onrender.com
-
-/* ================= MSAL CONFIG ================= */
+const BACKEND_URL = "http://localhost:3002";
 
 const msalConfig = {
 auth: {
@@ -90,8 +83,6 @@ msalInstance.setActiveAccount(currentAccount);
 }
 initializeMsal();
 
-/* ================= TOKEN ================= */
-
 async function getToken(){
 if(!currentAccount){
 const accounts=msalInstance.getAllAccounts();
@@ -110,8 +101,6 @@ account:currentAccount
 return response.accessToken;
 }
 
-/* ================= GRAPH CALL ================= */
-
 async function callGraph(endpoint){
 const token=await getToken();
 if(!token)return null;
@@ -124,18 +113,13 @@ if(!response.ok)throw new Error("Graph API error: "+response.status);
 return response.json();
 }
 
-/* ================= DOWNLOAD FUNCTION ================= */
-
 async function downloadFile(itemId,fileName){
-
 const token=await getToken();
 if(!token)return;
 
 const response=await fetch(
 `https://graph.microsoft.com/v1.0/me/drive/items/${itemId}/content`,
-{
-headers:{Authorization:"Bearer "+token}
-}
+{ headers:{Authorization:"Bearer "+token} }
 );
 
 if(!response.ok){
@@ -156,17 +140,12 @@ a.remove();
 window.URL.revokeObjectURL(url);
 }
 
-/* ================= LOAD RECORDINGS ================= */
-
 async function loadRecordings(){
-
 const container=document.getElementById("recordingsList");
 container.innerHTML='<p class="loading">Loading recordings...</p>';
 
 try{
-
 const folderId="015RM5L7QFJSFG3HT6M5E3V2GSYMRC45PL";
-
 const data=await callGraph(
 `/me/drive/items/${folderId}/children?$select=id,name,size,webUrl,lastModifiedDateTime`
 );
@@ -179,36 +158,20 @@ return;
 const recordings=data.value.filter(f=>f.name.toLowerCase().endsWith(".mp4"));
 
 container.innerHTML=recordings.map(r=>{
-
 const size=(r.size/1024/1024).toFixed(1)+" MB";
 const date=new Date(r.lastModifiedDateTime).toLocaleString();
 
 return `
 <div class="item-card">
-
 <div class="item-title">${r.name}</div>
-
 <div style="font-size:12px;color:#444;margin-bottom:6px;">
-<strong>Item ID:</strong><br>
-${r.id}
+<strong>Item ID:</strong><br>${r.id}
 </div>
-
-<div class="item-meta">
-Size: ${size} | Date: ${date}
-</div>
-
-<button class="btn"
-onclick="downloadFile('${r.id}','${r.name}')">
-Download MP4
-</button>
-
-<a href="${r.webUrl}" target="_blank" class="btn">
-Open in OneDrive
-</a>
-
+<div class="item-meta">Size: ${size} | Date: ${date}</div>
+<button class="btn" onclick="downloadFile('${r.id}','${r.name}')">Download MP4</button>
+<a href="${r.webUrl}" target="_blank" class="btn">Open in OneDrive</a>
 </div>
 `;
-
 }).join("");
 
 }catch(error){
@@ -216,26 +179,22 @@ container.innerHTML='<div class="error-msg">Error: '+error.message+'</div>';
 }
 }
 
-/* ================= NEW BOT RECORDING FUNCTIONS ================= */
+/* ================= FIXED PART ================= */
 
-// Grant calendar access
+// FIX 1: use homeAccountId only
 async function grantCalendarAccess() {
     if (!currentAccount) {
         alert('Please sign in first by clicking "Refresh Recordings"');
         return;
     }
     
-    const userId = currentAccount.username || currentAccount.homeAccountId;
+    const userId = currentAccount.homeAccountId;  // ✅ FIXED
     localStorage.setItem('botUserId', userId);
     
     window.open(`${BACKEND_URL}/api/auth/grant?userId=${encodeURIComponent(userId)}`, '_blank', 'width=600,height=700');
-    
-    setTimeout(() => {
-        alert('✅ After granting access, click "Show Upcoming Meetings"');
-    }, 1000);
 }
 
-// Load upcoming meetings
+// FIX 2: safe joinUrl handling
 async function loadUpcomingMeetings() {
     const container = document.getElementById('upcomingMeetings');
     container.innerHTML = '<p class="loading">Loading your upcoming meetings...</p>';
@@ -268,80 +227,15 @@ async function loadUpcomingMeetings() {
                 <div class="item-meta">
                     Starts: ${new Date(m.startTime).toLocaleString()}
                 </div>
-                <button class="btn success" onclick="startBotRecording('${m.meetingId}', '${encodeURIComponent(m.joinUrl)}', '${encodeURIComponent(m.meetingName)}')">
+                <button class="btn success" 
+                onclick="startBotRecording('${m.meetingId}', '${encodeURIComponent(m.joinUrl || "")}', '${encodeURIComponent(m.meetingName || "")}')">
                     🎥 Record This Meeting
                 </button>
             </div>
         `).join('');
         
     } catch (error) {
-        container.innerHTML = '<div class="error-msg">Error: ' + error.message + '<br>Make sure backend is running at: ' + BACKEND_URL + '</div>';
-    }
-}
-
-// Start bot recording
-async function startBotRecording(meetingId, meetingUrl, meetingName) {
-    const userId = localStorage.getItem('botUserId');
-    
-    if (!confirm(`Start recording "${decodeURIComponent(meetingName)}"?`)) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/record/start`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: userId,
-                meetingId: meetingId,
-                meetingUrl: decodeURIComponent(meetingUrl),
-                meetingName: decodeURIComponent(meetingName)
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            alert(`✅ Recording started!\n\nRecording ID: ${data.recordingId}\n\nThe bot will join the meeting and upload to Google Drive when finished.`);
-            
-            // Show status checker
-            const statusHtml = `
-                <div class="item-card" style="border-left-color:#27ae60;">
-                    <div class="item-title">🎥 Recording in Progress</div>
-                    <div class="item-meta">Recording ID: ${data.recordingId}</div>
-                    <button class="btn" onclick="checkRecordingStatus('${data.recordingId}')">Check Status</button>
-                </div>
-            `;
-            document.getElementById('upcomingMeetings').insertAdjacentHTML('afterbegin', statusHtml);
-        } else {
-            alert('❌ Failed to start recording: ' + (data.error || 'Unknown error'));
-        }
-        
-    } catch (error) {
-        alert('❌ Error: ' + error.message);
-    }
-}
-
-// Check recording status
-async function checkRecordingStatus(recordingId) {
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/record/status/${recordingId}`);
-        const data = await response.json();
-        
-        let message = `Recording Status: ${data.status}\n\n`;
-        
-        if (data.status === 'completed' && data.googleDriveLink) {
-            message += `✅ Recording completed!\n\nGoogle Drive: ${data.googleDriveLink}`;
-        } else if (data.status === 'failed') {
-            message += `❌ Recording failed\n\nError: ${data.error}`;
-        } else {
-            message += `⏳ Still recording...\n\nStarted: ${new Date(data.startTime).toLocaleString()}`;
-        }
-        
-        alert(message);
-        
-    } catch (error) {
-        alert('Error checking status: ' + error.message);
+        container.innerHTML = '<div class="error-msg">Error: ' + error.message + '</div>';
     }
 }
 
